@@ -1,0 +1,20 @@
+[phases.setup]
+nixPkgs = ["python311"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[start]
+cmd = "python3 BOT.PY"
+```
+
+Press **Command + S** to save.
+
+---
+
+**Then in Terminal:**
+```
+cd ~/Desktop/ICFXBOT1
+git add .
+git commit -m "Add nixpacks config"
+git push origin main
