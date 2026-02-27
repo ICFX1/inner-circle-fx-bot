@@ -225,5 +225,45 @@ async def help_command(ctx):
     embed.add_field(name="/stats", value="View your personal stats and journal count", inline=False)
     embed.set_footer(text="The Inner Circle FX | Where Serious Traders Come To Grow")
     await ctx.send(embed=embed)
+@bot.command(name='chart')
+async def analyse_chart(ctx):
+    if not ctx.message.attachments:
+        await ctx.send("📎 Please attach a TradingView screenshot with this command.")
+        return
 
+    await ctx.send("⏳ Analysing your chart...")
+
+    attachment = ctx.message.attachments[0]
+    image_data = await attachment.read()
+    import base64
+    encoded_image = base64.b64encode(image_data).decode('utf-8')
+
+    try:
+        ai_response = client_ai.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert forex trader for The Inner Circle FX. Analyse the chart and respond with: 📈 OVERALL BIAS, 🔴 SUPPLY ZONES, 🟢 DEMAND ZONES, 🎯 KEY LEVELS, 💡 TRADE IDEAS. Be specific with price levels. Keep it concise."
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encoded_image}"}},
+                        {"type": "text", "text": "Analyse this forex chart."}
+                    ]
+                }
+            ],
+            max_tokens=1000
+        )
+
+        analysis = ai_response.choices[0].message.content
+        embed = discord.Embed(title="📊 Inner Circle FX — Chart Analysis", color=0xFFD700)
+        embed.add_field(name="Analysis", value=analysis[:1024], inline=False)
+        embed.set_footer(text="The Inner Circle FX | Where Serious Traders Come To Grow")
+        await ctx.send(embed=embed)
+
+    except Exception as e:
+        await ctx.send(f"❌ Error analysing chart: {str(e)}")
+        
 bot.run(DISCORD_TOKEN)
