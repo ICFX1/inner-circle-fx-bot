@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 import io
+import base64
 from datetime import datetime
 
 load_dotenv()
@@ -52,7 +53,7 @@ async def analyse_trades(ctx):
 
     try:
         total_trades = len(df)
-        
+
         profit_col = None
         for col in df.columns:
             if 'profit' in col.lower() or 'pnl' in col.lower():
@@ -141,23 +142,24 @@ Worst Pair:       {worst_pair}
         await ctx.send(embed=embed)
 
     except Exception as e:
-        await ctx.send(f"❌ Something went wrong analysing your trades. Please make sure your CSV is exported correctly from MT4/MT5.\n\nError: {str(e)}")
+        await ctx.send(f"❌ Something went wrong analysing your trades.\n\nError: {str(e)}")
+
 
 @bot.command(name='journal')
 async def journal_trade(ctx, *, trade_info):
     user_id = str(ctx.author.id)
-    
+
     if user_id not in trade_journals:
         trade_journals[user_id] = []
-    
+
     entry = {
         'date': datetime.now().strftime('%Y-%m-%d %H:%M'),
         'trade': trade_info,
         'user': ctx.author.name
     }
-    
+
     trade_journals[user_id].append(entry)
-    
+
     embed = discord.Embed(
         title="📓 Trade Journal Entry Saved",
         color=0xFFD700
@@ -166,33 +168,35 @@ async def journal_trade(ctx, *, trade_info):
     embed.add_field(name="Date", value=entry['date'], inline=False)
     embed.add_field(name="Total Entries", value=str(len(trade_journals[user_id])), inline=False)
     embed.set_footer(text="The Inner Circle FX | Keep journaling — it's your edge")
-    
+
     await ctx.send(embed=embed)
+
 
 @bot.command(name='myjournal')
 async def view_journal(ctx):
     user_id = str(ctx.author.id)
-    
+
     if user_id not in trade_journals or len(trade_journals[user_id]) == 0:
         await ctx.send("📓 You haven't logged any trades yet. Use `/journal your trade details` to start journaling.")
         return
-    
+
     entries = trade_journals[user_id][-5:]
-    
+
     embed = discord.Embed(
         title=f"📓 {ctx.author.name}'s Trade Journal",
         color=0xFFD700
     )
-    
+
     for i, entry in enumerate(entries, 1):
         embed.add_field(
-            name=f"Entry {i} — {entry['date']}", 
-            value=entry['trade'][:200], 
+            name=f"Entry {i} — {entry['date']}",
+            value=entry['trade'][:200],
             inline=False
         )
-    
+
     embed.set_footer(text=f"Showing last 5 entries | Total: {len(trade_journals[user_id])} | The Inner Circle FX")
     await ctx.send(embed=embed)
+
 
 @bot.command(name='stats')
 async def my_stats(ctx):
@@ -213,31 +217,34 @@ async def my_stats(ctx):
     embed.set_footer(text="The Inner Circle FX | Where Serious Traders Come To Grow")
     await ctx.send(embed=embed)
 
+
 @bot.command(name='icfxhelp')
 async def help_command(ctx):
     embed = discord.Embed(
         title="🤖 Inner Circle FX Bot — Commands",
         color=0xFFD700
     )
-    embed.add_field(name="/analyse", value="Upload your MT4/MT5 CSV trade history and get a full AI powered analysis of your trading performance", inline=False)
-    embed.add_field(name="/journal [trade details]", value="Log a trade to your personal journal. Example: /journal Bought EURUSD at 1.0850, SL 1.0800, TP 1.0950. Confluences: structure, fibonacci, London open", inline=False)
+    embed.add_field(name="/analyse", value="Upload your MT4/MT5 CSV trade history and get a full AI powered analysis", inline=False)
+    embed.add_field(name="/chart", value="Upload a TradingView screenshot and get AI analysis of bias, supply/demand zones and trade ideas", inline=False)
+    embed.add_field(name="/journal [trade details]", value="Log a trade to your personal journal", inline=False)
     embed.add_field(name="/myjournal", value="View your last 5 journal entries", inline=False)
     embed.add_field(name="/stats", value="View your personal stats and journal count", inline=False)
     embed.set_footer(text="The Inner Circle FX | Where Serious Traders Come To Grow")
     await ctx.send(embed=embed)
+
+
 @bot.command(name='chart')
 async def analyse_chart(ctx):
     if not ctx.message.attachments:
         await ctx.send("📎 Please attach a TradingView screenshot with this command.")
         return
 
-    await ctx.send("⏳ Analysing your chart... (this may take 30 seconds)")
-print(f"Chart command received from {ctx.author.name}, attachment: {attachment.filename}")
-
+    await ctx.send("⏳ Analysing your chart... this may take 30 seconds.")
 
     attachment = ctx.message.attachments[0]
+    print(f"Chart command received from {ctx.author.name}, attachment: {attachment.filename}")
+
     image_data = await attachment.read()
-    import base64
     encoded_image = base64.b64encode(image_data).decode('utf-8')
 
     try:
@@ -267,5 +274,6 @@ print(f"Chart command received from {ctx.author.name}, attachment: {attachment.f
 
     except Exception as e:
         await ctx.send(f"❌ Error analysing chart: {str(e)}")
-        
+
+
 bot.run(DISCORD_TOKEN)
