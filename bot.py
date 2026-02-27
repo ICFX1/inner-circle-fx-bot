@@ -39,7 +39,7 @@ async def post_daily_briefing():
                     await channel.send("⏳ Generating today's market briefing...")
 
                     ai_response = client_ai.chat.completions.create(
-                        model="gpt-4",
+                        model="gpt-3.5-turbo",
                         messages=[
                             {
                                 "role": "system",
@@ -104,7 +104,7 @@ async def manual_briefing(ctx):
     now = datetime.utcnow()
     try:
         ai_response = client_ai.chat.completions.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages=[
                 {
                     "role": "system",
@@ -216,7 +216,7 @@ async def analyse_trades(ctx):
         """
 
         ai_response = client_ai.chat.completions.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages=[
                 {
                     "role": "system",
