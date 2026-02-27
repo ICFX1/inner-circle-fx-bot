@@ -7,6 +7,7 @@ from openai import OpenAI
 import io
 import base64
 from datetime import datetime
+import asyncio
 
 load_dotenv()
 
@@ -23,6 +24,70 @@ bot = commands.Bot(command_prefix='/', intents=intents)
 
 trade_journals = {}
 
+BRIEFING_CHANNEL_ID = 1474414193838129338
+
+async def post_daily_briefing():
+    await bot.wait_until_ready()
+    while not bot.is_closed():
+        now = datetime.utcnow()
+        # Post at 7:30am UK time (UTC+0 in winter, UTC+1 in summer)
+        # Using 7:30 UTC to cover both
+        if now.hour == 7 and now.minute == 30:
+            channel = bot.get_channel(BRIEFING_CHANNEL_ID)
+            if channel:
+                try:
+                    await channel.send("⏳ Generating today's market briefing...")
+
+                    ai_response = client_ai.chat.completions.create(
+                        model="gpt-4",
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": """You are a professional forex analyst for The Inner Circle FX. 
+                                Generate a concise daily market briefing formatted for Discord.
+                                Include these sections:
+                                
+                                📅 DAILY OUTLOOK — Brief overview of today's market sentiment
+                                
+                                💱 PAIR BIAS
+                                • GBPUSD — Bias + 1 sentence reason
+                                • EURUSD — Bias + 1 sentence reason  
+                                • USDJPY — Bias + 1 sentence reason
+                                
+                                🔑 KEY LEVELS TO WATCH — 2-3 important levels across the major pairs
+                                
+                                ⚠️ HIGH IMPACT NEWS — Any major news events today (if none, say clear calendar)
+                                
+                                💡 LONDON OPEN WATCH — What to look for in the 8-9am session
+                                
+                                Keep it concise and actionable. Format cleanly for Discord."""
+                            },
+                            {
+                                "role": "user",
+                                "content": f"Generate the daily forex market briefing for {now.strftime('%A %d %B %Y')}."
+                            }
+                        ]
+                    )
+
+                    briefing = ai_response.choices[0].message.content
+
+                    embed = discord.Embed(
+                        title=f"🌍 Daily Market Briefing — {now.strftime('%A %d %B %Y')}",
+                        color=0xFFD700
+                    )
+                    embed.add_field(name="Today's Analysis", value=briefing[:1024], inline=False)
+                    embed.set_footer(text="The Inner Circle FX | Where Serious Traders Come To Grow")
+
+                    await channel.send(embed=embed)
+
+                except Exception as e:
+                    print(f"Error posting daily briefing: {e}")
+
+            await asyncio.sleep(60)  # Wait 60 seconds after posting to avoid double post
+        else:
+            await asyncio.sleep(30)  # Check every 30 seconds
+
+
 @bot.event
 async def on_ready():
     print(f'{bot.user} is online and ready!')
@@ -30,6 +95,59 @@ async def on_ready():
         type=discord.ActivityType.watching,
         name="the markets 📈"
     ))
+    bot.loop.create_task(post_daily_briefing())
+
+
+@bot.command(name='briefing')
+async def manual_briefing(ctx):
+    await ctx.send("⏳ Generating market briefing...")
+    now = datetime.utcnow()
+    try:
+        ai_response = client_ai.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """You are a professional forex analyst for The Inner Circle FX. 
+                    Generate a concise daily market briefing formatted for Discord.
+                    Include these sections:
+                    
+                    📅 DAILY OUTLOOK — Brief overview of today's market sentiment
+                    
+                    💱 PAIR BIAS
+                    • GBPUSD — Bias + 1 sentence reason
+                    • EURUSD — Bias + 1 sentence reason  
+                    • USDJPY — Bias + 1 sentence reason
+                    
+                    🔑 KEY LEVELS TO WATCH — 2-3 important levels across the major pairs
+                    
+                    ⚠️ HIGH IMPACT NEWS — Any major news events today (if none, say clear calendar)
+                    
+                    💡 LONDON OPEN WATCH — What to look for in the 8-9am session
+                    
+                    Keep it concise and actionable. Format cleanly for Discord."""
+                },
+                {
+                    "role": "user",
+                    "content": f"Generate the daily forex market briefing for {now.strftime('%A %d %B %Y')}."
+                }
+            ]
+        )
+
+        briefing = ai_response.choices[0].message.content
+
+        embed = discord.Embed(
+            title=f"🌍 Daily Market Briefing — {now.strftime('%A %d %B %Y')}",
+            color=0xFFD700
+        )
+        embed.add_field(name="Today's Analysis", value=briefing[:1024], inline=False)
+        embed.set_footer(text="The Inner Circle FX | Where Serious Traders Come To Grow")
+
+        await ctx.send(embed=embed)
+
+    except Exception as e:
+        await ctx.send(f"❌ Error generating briefing: {str(e)}")
+
 
 @bot.command(name='analyse')
 async def analyse_trades(ctx):
@@ -226,6 +344,7 @@ async def help_command(ctx):
     )
     embed.add_field(name="/analyse", value="Upload your MT4/MT5 CSV trade history and get a full AI powered analysis", inline=False)
     embed.add_field(name="/chart", value="Upload a TradingView screenshot and get AI analysis of bias, supply/demand zones and trade ideas", inline=False)
+    embed.add_field(name="/briefing", value="Generate an instant market briefing for today", inline=False)
     embed.add_field(name="/journal [trade details]", value="Log a trade to your personal journal", inline=False)
     embed.add_field(name="/myjournal", value="View your last 5 journal entries", inline=False)
     embed.add_field(name="/stats", value="View your personal stats and journal count", inline=False)
