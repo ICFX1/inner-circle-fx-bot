@@ -231,7 +231,9 @@ async def analyse_chart(ctx):
         await ctx.send("📎 Please attach a TradingView screenshot with this command.")
         return
 
-    await ctx.send("⏳ Analysing your chart...")
+    await ctx.send("⏳ Analysing your chart... (this may take 30 seconds)")
+print(f"Chart command received from {ctx.author.name}, attachment: {attachment.filename}")
+
 
     attachment = ctx.message.attachments[0]
     image_data = await attachment.read()
