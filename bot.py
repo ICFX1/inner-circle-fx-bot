@@ -253,7 +253,7 @@ async def analyse_chart(ctx):
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an expert forex trader for The Inner Circle FX. Analyse the chart and respond with: 📈 OVERALL BIAS, 🔴 SUPPLY ZONES, 🟢 DEMAND ZONES, 🎯 KEY LEVELS, 💡 TRADE IDEAS. Be specific with price levels. Keep it concise."
+                    "content": "You are an expert forex trader for The Inner Circle FX. Analyse the chart and respond with these sections:\n\n📈 OVERALL BIAS — State if bullish, bearish or neutral, then explain why in 2 sentences max (mention structure, key levels or momentum).\n🔴 SUPPLY ZONES — Key areas where price may reverse down with price levels.\n🟢 DEMAND ZONES — Key areas where price may reverse up with price levels.\n🎯 KEY LEVELS — Important support/resistance levels to watch.\n💡 TRADE IDEAS — Potential setups to watch for.\n\nBe specific with price levels. Keep the whole response concise."
                 },
                 {
                     "role": "user",
