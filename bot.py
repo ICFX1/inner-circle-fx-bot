@@ -15,6 +15,8 @@ load_dotenv()
 
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+SUPABASE_URL = os.getenv('SUPABASE_URL')
+SUPABASE_KEY = os.getenv('SUPABASE_KEY')
 
 client_ai = OpenAI(api_key=OPENAI_API_KEY)
 
@@ -24,11 +26,67 @@ intents.members = True
 
 bot = commands.Bot(command_prefix='/', intents=intents)
 
-trade_journals = {}
-
 BRIEFING_CHANNEL_ID = 1474414193838129338
 
 
+# --- Supabase helpers ---
+def db_request(method, endpoint, data=None):
+    url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
+    headers = {
+        'apikey': SUPABASE_KEY,
+        'Authorization': f'Bearer {SUPABASE_KEY}',
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+    }
+    body = json.dumps(data).encode() if data else None
+    req = urllib.request.Request(url, data=body, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as response:
+            return json.loads(response.read())
+    except Exception as e:
+        print(f"DB error: {e}")
+        return None
+
+def save_journal_entry(user_id, username, entry):
+    return db_request('POST', 'journal', {
+        'user_id': user_id,
+        'username': username,
+        'entry': entry
+    })
+
+def get_journal_entries(user_id, limit=5):
+    url = f"{SUPABASE_URL}/rest/v1/journal?user_id=eq.{user_id}&order=created_at.desc&limit={limit}"
+    headers = {
+        'apikey': SUPABASE_KEY,
+        'Authorization': f'Bearer {SUPABASE_KEY}',
+    }
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as response:
+            return json.loads(response.read())
+    except Exception as e:
+        print(f"DB error: {e}")
+        return []
+
+def get_journal_count(user_id):
+    url = f"{SUPABASE_URL}/rest/v1/journal?user_id=eq.{user_id}&select=id"
+    headers = {
+        'apikey': SUPABASE_KEY,
+        'Authorization': f'Bearer {SUPABASE_KEY}',
+        'Prefer': 'count=exact'
+    }
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as response:
+            count_header = response.headers.get('Content-Range', '0')
+            total = count_header.split('/')[-1]
+            return int(total) if total != '*' else 0
+    except Exception as e:
+        print(f"DB error: {e}")
+        return 0
+
+
+# --- Live prices ---
 def get_live_prices():
     pairs = {
         'GBPUSD': 'GBPUSD=X',
@@ -82,7 +140,6 @@ def format_prices_for_embed(prices):
 
 async def generate_briefing(now, prices):
     price_text = format_prices_for_ai(prices)
-
     ai_response = client_ai.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
@@ -126,23 +183,18 @@ async def post_daily_briefing():
             if channel:
                 try:
                     await channel.send("⏳ Fetching live prices and generating today's market briefing...")
-
                     prices = get_live_prices()
                     briefing = await generate_briefing(now, prices)
-
                     embed = discord.Embed(
                         title=f"🌍 Daily Market Briefing — {now.strftime('%A %d %B %Y')}",
                         color=0xFFD700
                     )
                     embed.add_field(name="💹 Live Prices", value=format_prices_for_embed(prices), inline=False)
                     embed.add_field(name="📊 Analysis", value=briefing[:1024], inline=False)
-                    embed.set_footer(text="The Inner Circle FX | Live prices via Yahoo Finance")
-
+                    embed.set_footer(text="The Inner Circle FX | Prices via Yahoo Finance — may vary slightly from TradingView")
                     await channel.send(embed=embed)
-
                 except Exception as e:
                     print(f"Error posting daily briefing: {e}")
-
             await asyncio.sleep(60)
         else:
             await asyncio.sleep(30)
@@ -165,17 +217,14 @@ async def manual_briefing(ctx):
     try:
         prices = get_live_prices()
         briefing = await generate_briefing(now, prices)
-
         embed = discord.Embed(
             title=f"🌍 Daily Market Briefing — {now.strftime('%A %d %B %Y')}",
             color=0xFFD700
         )
         embed.add_field(name="💹 Live Prices", value=format_prices_for_embed(prices), inline=False)
         embed.add_field(name="📊 Analysis", value=briefing[:1024], inline=False)
-        embed.set_footer(text="The Inner Circle FX | Live prices via Yahoo Finance")
-
+        embed.set_footer(text="The Inner Circle FX | Prices via Yahoo Finance — may vary slightly from TradingView")
         await ctx.send(embed=embed)
-
     except Exception as e:
         await ctx.send(f"❌ Error generating briefing: {str(e)}")
 
@@ -187,7 +236,6 @@ async def analyse_trades(ctx):
         return
 
     await ctx.send("⏳ Analysing your trades... this may take a moment.")
-
     attachment = ctx.message.attachments[0]
     file_content = await attachment.read()
 
@@ -202,7 +250,6 @@ async def analyse_trades(ctx):
 
     try:
         total_trades = len(df)
-
         profit_col = None
         for col in df.columns:
             if 'profit' in col.lower() or 'pnl' in col.lower():
@@ -210,7 +257,7 @@ async def analyse_trades(ctx):
                 break
 
         if profit_col is None:
-            await ctx.send("❌ Could not find profit column in your file. Please make sure you exported correctly from MT4/MT5.")
+            await ctx.send("❌ Could not find profit column in your file.")
             return
 
         df[profit_col] = pd.to_numeric(df[profit_col], errors='coerce')
@@ -268,11 +315,7 @@ async def analyse_trades(ctx):
         )
 
         ai_feedback = ai_response.choices[0].message.content
-
-        embed = discord.Embed(
-            title="🤖 Inner Circle FX — Trade Analysis",
-            color=0xFFD700
-        )
+        embed = discord.Embed(title="🤖 Inner Circle FX — Trade Analysis", color=0xFFD700)
         embed.add_field(name="📊 Your Statistics", value=f"""
 ```
 Total Trades:     {total_trades}
@@ -287,7 +330,6 @@ Worst Pair:       {worst_pair}
 ```""", inline=False)
         embed.add_field(name="🧠 AI Coaching Feedback", value=ai_feedback[:1024], inline=False)
         embed.set_footer(text="The Inner Circle FX | Where Serious Traders Come To Grow")
-
         await ctx.send(embed=embed)
 
     except Exception as e:
@@ -297,82 +339,62 @@ Worst Pair:       {worst_pair}
 @bot.command(name='journal')
 async def journal_trade(ctx, *, trade_info):
     user_id = str(ctx.author.id)
+    username = ctx.author.name
 
-    if user_id not in trade_journals:
-        trade_journals[user_id] = []
+    result = save_journal_entry(user_id, username, trade_info)
+    count = get_journal_count(user_id)
 
-    entry = {
-        'date': datetime.now().strftime('%Y-%m-%d %H:%M'),
-        'trade': trade_info,
-        'user': ctx.author.name
-    }
-
-    trade_journals[user_id].append(entry)
-
-    embed = discord.Embed(
-        title="📓 Trade Journal Entry Saved",
-        color=0xFFD700
-    )
+    embed = discord.Embed(title="📓 Trade Journal Entry Saved", color=0xFFD700)
     embed.add_field(name="Entry", value=trade_info, inline=False)
-    embed.add_field(name="Date", value=entry['date'], inline=False)
-    embed.add_field(name="Total Entries", value=str(len(trade_journals[user_id])), inline=False)
+    embed.add_field(name="Date", value=datetime.now().strftime('%Y-%m-%d %H:%M'), inline=False)
+    embed.add_field(name="Total Entries", value=str(count), inline=False)
     embed.set_footer(text="The Inner Circle FX | Keep journaling — it's your edge")
-
     await ctx.send(embed=embed)
 
 
 @bot.command(name='myjournal')
 async def view_journal(ctx):
     user_id = str(ctx.author.id)
+    entries = get_journal_entries(user_id, limit=5)
 
-    if user_id not in trade_journals or len(trade_journals[user_id]) == 0:
+    if not entries:
         await ctx.send("📓 You haven't logged any trades yet. Use `/journal your trade details` to start journaling.")
         return
 
-    entries = trade_journals[user_id][-5:]
-
-    embed = discord.Embed(
-        title=f"📓 {ctx.author.name}'s Trade Journal",
-        color=0xFFD700
-    )
+    embed = discord.Embed(title=f"📓 {ctx.author.name}'s Trade Journal", color=0xFFD700)
 
     for i, entry in enumerate(entries, 1):
+        date = entry.get('created_at', '')[:16].replace('T', ' ')
         embed.add_field(
-            name=f"Entry {i} — {entry['date']}",
-            value=entry['trade'][:200],
+            name=f"Entry {i} — {date}",
+            value=entry['entry'][:200],
             inline=False
         )
 
-    embed.set_footer(text=f"Showing last 5 entries | Total: {len(trade_journals[user_id])} | The Inner Circle FX")
+    total = get_journal_count(user_id)
+    embed.set_footer(text=f"Showing last 5 entries | Total: {total} | The Inner Circle FX")
     await ctx.send(embed=embed)
 
 
 @bot.command(name='stats')
 async def my_stats(ctx):
-    embed = discord.Embed(
-        title=f"📊 {ctx.author.name}'s Stats",
-        color=0xFFD700
-    )
+    user_id = str(ctx.author.id)
+    count = get_journal_count(user_id)
+
+    embed = discord.Embed(title=f"📊 {ctx.author.name}'s Stats", color=0xFFD700)
     embed.add_field(
         name="How to get your full stats",
-        value="Upload your MT4/MT5 CSV file using the `/analyse` command and the bot will give you a complete breakdown of your trading performance.",
+        value="Upload your MT4/MT5 CSV file using the `/analyse` command for a complete breakdown.",
         inline=False
     )
-    embed.add_field(
-        name="Journal Entries",
-        value=str(len(trade_journals.get(str(ctx.author.id), []))),
-        inline=False
-    )
+    embed.add_field(name="Journal Entries", value=str(count), inline=False)
     embed.set_footer(text="The Inner Circle FX | Where Serious Traders Come To Grow")
     await ctx.send(embed=embed)
 
 
 @bot.command(name='icfxhelp')
 async def help_command(ctx):
-    embed = discord.Embed(
-        title="🤖 Inner Circle FX Bot — Commands",
-        color=0xFFD700
-    )
+    embed = discord.Embed(title="🤖 Inner Circle FX Bot — Commands", color=0xFFD700)
     embed.add_field(name="/analyse", value="Upload your MT4/MT5 CSV trade history and get a full AI powered analysis", inline=False)
     embed.add_field(name="/chart", value="Upload a TradingView screenshot and get AI analysis of bias, supply/demand zones and trade ideas", inline=False)
     embed.add_field(name="/briefing", value="Generate an instant market briefing with live prices", inline=False)
@@ -390,7 +412,6 @@ async def analyse_chart(ctx):
         return
 
     await ctx.send("⏳ Analysing your chart... this may take 30 seconds.")
-
     attachment = ctx.message.attachments[0]
     print(f"Chart command received from {ctx.author.name}, attachment: {attachment.filename}")
 
