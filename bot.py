@@ -136,7 +136,7 @@ async def post_daily_briefing():
                     )
                     embed.add_field(name="💹 Live Prices", value=format_prices_for_embed(prices), inline=False)
                     embed.add_field(name="📊 Analysis", value=briefing[:1024], inline=False)
-                    embed.set_footer(text="The Inner Circle FX | Live prices via Yahoo Finance")
+                    embed.set_footer(text="The Inner Circle FX | Prices via Yahoo Finance — may vary slightly from TradingView")
 
                     await channel.send(embed=embed)
 
@@ -172,7 +172,7 @@ async def manual_briefing(ctx):
         )
         embed.add_field(name="💹 Live Prices", value=format_prices_for_embed(prices), inline=False)
         embed.add_field(name="📊 Analysis", value=briefing[:1024], inline=False)
-        embed.set_footer(text="The Inner Circle FX | Live prices via Yahoo Finance")
+        embed.set_footer(text="The Inner Circle FX | Prices via Yahoo Finance — may vary slightly from TradingView")
 
         await ctx.send(embed=embed)
 
