@@ -102,7 +102,7 @@ async def generate_briefing(now, prices):
                 
                 🔑 KEY LEVELS TO WATCH — 2-3 important levels based on current prices
                 
-                ⚠️ HIGH IMPACT NEWS — Any major news events today (if unknown, say check Forex Factory)
+                ⚠️ HIGH IMPACT NEWS — List any real high impact forex news events scheduled for today (NFP, CPI, interest rate decisions, PMI, GDP etc). Use your knowledge of the economic calendar. If there are none, say clear calendar today.
                 
                 💡 LONDON OPEN WATCH — What to look for in the 8-9am session
                 
@@ -136,7 +136,7 @@ async def post_daily_briefing():
                     )
                     embed.add_field(name="💹 Live Prices", value=format_prices_for_embed(prices), inline=False)
                     embed.add_field(name="📊 Analysis", value=briefing[:1024], inline=False)
-                    embed.set_footer(text="The Inner Circle FX | Prices via Yahoo Finance — may vary slightly from TradingView")
+                    embed.set_footer(text="The Inner Circle FX | Live prices via Yahoo Finance")
 
                     await channel.send(embed=embed)
 
@@ -172,7 +172,7 @@ async def manual_briefing(ctx):
         )
         embed.add_field(name="💹 Live Prices", value=format_prices_for_embed(prices), inline=False)
         embed.add_field(name="📊 Analysis", value=briefing[:1024], inline=False)
-        embed.set_footer(text="The Inner Circle FX | Prices via Yahoo Finance — may vary slightly from TradingView")
+        embed.set_footer(text="The Inner Circle FX | Live prices via Yahoo Finance")
 
         await ctx.send(embed=embed)
 
