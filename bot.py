@@ -210,6 +210,30 @@ async def on_ready():
     bot.loop.create_task(post_daily_briefing())
 
 
+
+@bot.event
+async def on_member_join(member):
+    try:
+        embed = discord.Embed(
+            title="👋 Welcome to The Inner Circle FX!",
+            description="You've just joined one of the most serious forex communities around. Here's what you have access to:",
+            color=0xFFD700
+        )
+        embed.add_field(name="🤖 AI-Powered Bot Commands", value="""
+`/chart` — Upload a TradingView screenshot for instant AI analysis
+`/briefing` — Get a live market briefing with real prices
+`/journal` — Log your trades to build discipline
+`/myjournal` — Review your last 5 journal entries
+`/analyse` — Upload your MT4/MT5 history for AI coaching
+`/icfxhelp` — See all commands anytime""", inline=False)
+        embed.add_field(name="📈 Daily Briefings", value="Every morning at 7:30am UK time we post a live market briefing in #daily-market-overview", inline=False)
+        embed.add_field(name="💰 The Edge", value="The edge is in the details. Let's get to work.", inline=False)
+        embed.set_footer(text="The Inner Circle FX | Where Serious Traders Come To Grow")
+        await member.send(embed=embed)
+        print(f"Welcome DM sent to {member.name}")
+    except Exception as e:
+        print(f"Could not send welcome DM to {member.name}: {e}")
+
 @bot.command(name='briefing')
 async def manual_briefing(ctx):
     await ctx.send("⏳ Fetching live prices and generating market briefing...")
